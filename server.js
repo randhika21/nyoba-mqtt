@@ -1,10 +1,14 @@
+const express = require('express');
 const mqtt = require('mqtt');
 const admin = require('firebase-admin');
 
-// Ambil kredensial dari environment variable
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Ambil kredensial dari environment variable (pastikan sudah diset di Render)
 const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 
-// Fix pem key by replacing escaped newlines with real newlines
+// Fix private key (ganti \\n jadi newline beneran)
 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
 // Inisialisasi Firebase Admin
@@ -13,12 +17,11 @@ admin.initializeApp({
   databaseURL: 'https://nyoba-b974e-default-rtdb.asia-southeast1.firebasedatabase.app'
 });
 
-const db = admin.firestore(); // atau gunakan admin.database() untuk Realtime Database
+const db = admin.firestore(); // pakai Firestore, bisa diganti admin.database() jika pake Realtime DB
 
-// Connect ke broker MQTT
+// MQTT setup
 const client = mqtt.connect('mqtt://broker.hivemq.com');
 
-// Topik yang sama dengan ESP32
 const topicSuhu = 'awikwoksuhu';
 const topicKelembapan = 'awikwokkelembapan';
 
@@ -47,7 +50,6 @@ client.on('message', async (topic, message) => {
     dataSensor.kelembapan = parseFloat(payload);
   }
 
-  // Simpan ke Firebase hanya jika kedua nilai sudah ada
   if (dataSensor.suhu !== null && dataSensor.kelembapan !== null) {
     dataSensor.timestamp = waktu;
 
@@ -58,11 +60,21 @@ client.on('message', async (topic, message) => {
       console.error('Gagal menyimpan ke Firebase:', error);
     }
 
-    // Reset agar tidak dobel-dobel
+    // Reset data supaya gak dobel
     dataSensor = {
       suhu: null,
       kelembapan: null,
       timestamp: null
     };
   }
+});
+
+// Web server endpoint buat health check / simple response
+app.get('/', (req, res) => {
+  res.send('Server MQTT + Firebase berjalan lancar 👍');
+});
+
+// Start web server supaya Render bisa detect open port
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
