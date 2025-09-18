@@ -1,14 +1,16 @@
 const mqtt = require('mqtt');
 const admin = require('firebase-admin');
-const serviceAccount = require('./firebase-adminsdk.json'); // ganti dengan path file kamu
+
+// Ambil kredensial dari environment variable
+const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 
 // Inisialisasi Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://nyoba-b974e-default-rtdb.asia-southeast1.firebasedatabase.app' // GANTI dengan database URL kamu
+  databaseURL: 'https://nyoba-b974e-default-rtdb.asia-southeast1.firebasedatabase.app'
 });
 
-const db = admin.firestore(); // atau admin.database() untuk Realtime DB
+const db = admin.firestore(); // atau gunakan admin.database() untuk Realtime Database
 
 // Connect ke broker MQTT
 const client = mqtt.connect('mqtt://broker.hivemq.com');
@@ -25,7 +27,11 @@ let dataSensor = {
 
 client.on('connect', () => {
   console.log('Terhubung ke broker MQTT');
-  client.subscribe([topicSuhu, topicKelembapan]);
+  client.subscribe([topicSuhu, topicKelembapan], (err) => {
+    if (err) {
+      console.error('Gagal subscribe:', err);
+    }
+  });
 });
 
 client.on('message', async (topic, message) => {
