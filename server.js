@@ -1,6 +1,6 @@
 const mqtt = require('mqtt');
 const admin = require('firebase-admin');
-const serviceAccount = require('./firebase-adminsdk.json'); // <- ganti jika beda
+const serviceAccount = require('./firebase-adminsdk.json'); // ganti dengan path file kamu
 
 // Inisialisasi Firebase Admin
 admin.initializeApp({
@@ -8,16 +8,15 @@ admin.initializeApp({
   databaseURL: 'https://nyoba-b974e-default-rtdb.asia-southeast1.firebasedatabase.app' // GANTI dengan database URL kamu
 });
 
-const db = admin.firestore();
+const db = admin.firestore(); // atau admin.database() untuk Realtime DB
 
+// Connect ke broker MQTT
 const client = mqtt.connect('mqtt://broker.hivemq.com');
 
-// Daftar topik
+// Topik yang sama dengan ESP32
 const topicSuhu = 'awikwoksuhu';
 const topicKelembapan = 'awikwokkelembapan';
-const topicRelay = 'awikwokrelay'; // ✅ Tambahan untuk relay
 
-// Data sensor sementara
 let dataSensor = {
   suhu: null,
   kelembapan: null,
@@ -25,8 +24,8 @@ let dataSensor = {
 };
 
 client.on('connect', () => {
-  console.log('✅ Terhubung ke broker MQTT');
-  client.subscribe([topicSuhu, topicKelembapan, topicRelay]); // ✅ Tambahkan topik relay
+  console.log('Terhubung ke broker MQTT');
+  client.subscribe([topicSuhu, topicKelembapan]);
 });
 
 client.on('message', async (topic, message) => {
@@ -37,36 +36,24 @@ client.on('message', async (topic, message) => {
     dataSensor.suhu = parseFloat(payload);
   } else if (topic === topicKelembapan) {
     dataSensor.kelembapan = parseFloat(payload);
-  } else if (topic === topicRelay) {
-    // ✅ Simpan data relay langsung
-    const relayData = {
-      status: payload === '1' ? 'ON' : 'OFF',
-      raw: payload,
-      timestamp: waktu
-    };
-
-    try {
-      await db.collection('relayData').add(relayData);
-      console.log('🔌 Data relay disimpan:', relayData);
-    } catch (error) {
-      console.error('❌ Gagal menyimpan data relay:', error);
-    }
-
-    return; // Jangan lanjut ke penyimpanan data sensor
   }
 
-  // Jika kedua data sensor sudah lengkap, simpan ke Firestore
+  // Simpan ke Firebase hanya jika kedua nilai sudah ada
   if (dataSensor.suhu !== null && dataSensor.kelembapan !== null) {
     dataSensor.timestamp = waktu;
 
     try {
       await db.collection('sensorData').add(dataSensor);
-      console.log('📥 Data sensor disimpan:', dataSensor);
+      console.log('Data disimpan ke Firebase:', dataSensor);
     } catch (error) {
-      console.error('❌ Gagal menyimpan data sensor:', error);
+      console.error('Gagal menyimpan ke Firebase:', error);
     }
 
-    // Reset data
-    dataSensor = { suhu: null, kelembapan: null, timestamp: null };
+    // Reset agar tidak dobel-dobel
+    dataSensor = {
+      suhu: null,
+      kelembapan: null,
+      timestamp: null
+    };
   }
 });
