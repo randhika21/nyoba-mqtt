@@ -1,6 +1,6 @@
 const mqtt = require('mqtt');
 const admin = require('firebase-admin');
-const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG); // <- ganti jika beda
+const serviceAccount = require('./firebase-adminsdk.json'); // <- ganti jika beda
 
 // Inisialisasi Firebase Admin
 admin.initializeApp({
